@@ -21,7 +21,7 @@ def categorize_score(score):
 
 st.title("MALLA REDDY ENGINEERING COLLEGE FOR WOMEN")
 st.markdown("### DEPARTMENT OF COMPUTER SCIENCE AND ENINEERING")
-st.markdown("###📊 Code Chef Result Analysis Portal")
+st.markdown("📊 Code Chef Result Analysis Portal")
 st.info("Upload your department's Excel file to generate the formatted Result Analysis Report.")
 
 uploaded_file = st.file_uploader("Choose an Excel file", type=["xlsx"])
@@ -94,4 +94,5 @@ if uploaded_file is not None:
 
     except Exception as e:
         st.error(f"Error: {e}. Please ensure the Excel file has 'Section' and 'User Score' columns.")
+
 
