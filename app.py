@@ -5,9 +5,10 @@ import io
 # Set page config
 st.set_page_config(page_title="MRECW Result Analysis", layout="wide")
 
-def categorize_score(score):
-    if str(score).strip().upper() == "AB":
-        return "AB"
+# --- Categorization Logic Functions ---
+
+def categorize_daily(score):
+    if str(score).strip().upper() == "AB": return "AB"
     try:
         score = float(score)
         if score == 300: return "300"
@@ -16,56 +17,99 @@ def categorize_score(score):
         elif 10 <= score < 100: return "100-10"
         elif score == 0: return "0"
         else: return "Others"
-    except:
-        return "Others"
+    except: return "Others"
 
-st.title("MALLA REDDY ENGINEERING COLLEGE FOR WOMEN")
-st.markdown("### DEPARTMENT OF COMPUTER SCIENCE AND ENINEERING")
-st.markdown("📊 Code Chef Result Analysis Portal")
-st.info("Upload your department's Excel file to generate the formatted Result Analysis Report.")
+def categorize_monday(score):
+    if str(score).strip().upper() == "AB": return "AB"
+    try:
+        score = float(score)
+        if score == 600: return "600"
+        elif 400 <= score < 600: return "400-599"
+        elif 200 <= score < 400: return "200-399"
+        elif 10 <= score < 200: return "10-199"
+        elif score == 0: return "0"
+        else: return "Others"
+    except: return "AB"
+
+def categorize_wednesday(grade):
+    try:
+        grade = float(grade)
+        if grade >= 1500: return ">1500"
+        elif 1000 <= grade < 1500: return "1000-1500"
+        elif 500 <= grade < 1000: return "500-999"
+        elif 100 <= grade < 500: return "100-499"
+        elif 1 <= grade < 100: return "1-99"
+        else: return "0"
+    except: return "0"
+
+# --- Main App Interface ---
+
+st.title(" MALLA REDDY ENGINEERING COLLEGE FOR WOMEN")
+st.markdown("### 📊 Code Chef Result Analysis Portal")
+st.markdown("### DEPARTMENT OF COMPUTER SCIENCE AND ENGINEERING")
+
+# Dropdown list placed after the Department heading
+contest_type = st.selectbox(
+    "Select Assessment Type:",
+    ["Daily Assessment", "Monday Contest", "Wednesday Contest"],
+    index=0
+)
+
+st.write("---") # Visual separator
+st.info(f"Please upload the Excel file for **{contest_type}** below.")
 
 uploaded_file = st.file_uploader("Choose an Excel file", type=["xlsx"])
 
 if uploaded_file is not None:
     try:
-        # Step 1: Process Data
         df = pd.read_excel(uploaded_file)
-        df["Category"] = df["User Score"].apply(categorize_score)
         
-        # Create Table
+        # Router logic based on dropdown selection
+        if contest_type == "Daily Assessment":
+            df["Category"] = df["User Score"].apply(categorize_daily)
+            score_cols = ["300", "299-200", "200-100", "100-10", "0", "AB"]
+            
+        elif contest_type == "Monday Contest":
+            df["Category"] = df["User Score"].apply(categorize_monday)
+            score_cols = ["600", "400-599", "200-399", "10-199", "0", "AB"]
+            
+        elif contest_type == "Wednesday Contest":
+            df["Category"] = df["Grade"].apply(categorize_wednesday)
+            score_cols = [">1500", "1000-1500", "500-999", "100-499", "1-99", "0"]
+
+        # Process the crosstab table
         result = pd.crosstab(df["Section"], df["Category"])
-        cols = ["300", "299-200", "200-100", "100-10", "0", "AB"]
-        result = result.reindex(columns=cols, fill_value=0)
+        result = result.reindex(columns=score_cols, fill_value=0)
         
-        # Calculate totals
-        result["Attended Count"] = result[["300", "299-200", "200-100", "100-10", "0"]].sum(axis=1)
-        result["Absentees"] = result["AB"]
+        # Statistics Calculation
+        if contest_type == "Wednesday Contest":
+            abs_counts = df[df['Attempted/Not'] == 'AB'].groupby('Section').size()
+            result['Absentees'] = abs_counts.reindex(result.index, fill_value=0)
+            result['Attended Count'] = result[score_cols].sum(axis=1)
+        else:
+            result['Absentees'] = result.get('AB', 0)
+            numeric_cols = [c for c in score_cols if c != "AB"]
+            result['Attended Count'] = result[numeric_cols].sum(axis=1)
+
         result["Total Strength"] = result["Attended Count"] + result["Absentees"]
         
-        # Add Remarks
-        result["Remark 1"] = result["0"].apply(lambda x: f"{x} Students got 0" if x > 0 else "")
-        result["Remark 2"] = result["Absentees"].apply(lambda x: f"{x} Students not written exam" if x > 0 else "")
-        
-        # Reset index for display
+        # Prepare final table for display
         result_final = result.reset_index()
         result_final.insert(0, 'S.No', range(1, 1 + len(result_final)))
         
-        st.success("Analysis Complete!")
+        st.success(f"{contest_type} Analysis Complete!")
         st.dataframe(result_final, use_container_width=True)
 
-        # Step 2: Excel Export with Formatting
+        # Excel Export logic with professional headers
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            result_final.to_excel(writer, index=False, startrow=8, sheet_name='Sheet1')
+            result_final.to_excel(writer, index=False, startrow=8, sheet_name='Analysis')
+            workbook = writer.book
+            worksheet = writer.sheets['Analysis']
             
-            workbook  = writer.book
-            worksheet = writer.sheets['Sheet1']
-            
-            # Formats
-            title_format = workbook.add_format({'align': 'center', 'valign': 'vcenter', 'bold': True, 'font_size': 12})
+            title_format = workbook.add_format({'align': 'center', 'bold': True, 'font_size': 12})
             header_format = workbook.add_format({'bold': True, 'border': 1, 'bg_color': '#D3D3D3', 'align': 'center'})
             
-            # Titles
             titles = [
                 "MALLA REDDY ENGINEERING COLLEGE FOR WOMEN",
                 "(Autonomous Institution-UGC, Govt. of India)",
@@ -74,13 +118,12 @@ if uploaded_file is not None:
                 "Approved by AICTE, Affiliated to JNTUH, ISO 9001:2015 Certified Institution.",
                 "Maisammaguda, Dhulapally, Secunderabad 500100.",
                 "DEPARTMENT OF COMPUTER SCIENCE AND ENGINEERING",
-                "CODE CHEF RESULT ANALYSIS DATA"
+                f"{contest_type.upper()} RESULT ANALYSIS DATA"
             ]
             
             for i, title in enumerate(titles):
-                worksheet.merge_range(i, 0, i, 11, title, title_format)
+                worksheet.merge_range(i, 0, i, len(result_final.columns)-1, title, title_format)
 
-            # Column formatting
             for col_num, value in enumerate(result_final.columns.values):
                 worksheet.write(8, col_num, value, header_format)
                 worksheet.set_column(col_num, col_num, 15)
@@ -88,11 +131,9 @@ if uploaded_file is not None:
         st.download_button(
             label="📥 Download Formatted Report",
             data=output.getvalue(),
-            file_name="Result_Analysis_Report.xlsx",
+            file_name=f"{contest_type.replace(' ', '_')}_Report.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
     except Exception as e:
-        st.error(f"Error: {e}. Please ensure the Excel file has 'Section' and 'User Score' columns.")
-
-
+        st.error(f"Error: {e}. Ensure columns match the {contest_type} format.")
