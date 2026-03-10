@@ -44,8 +44,8 @@ def categorize_wednesday(grade):
 
 # --- Main App Interface ---
 
-st.title(" MALLA REDDY ENGINEERING COLLEGE FOR WOMEN")
-st.markdown("### 📊 Code Chef Result Analysis Portal")
+st.title("📊 MALLA REDDY ENGINEERING COLLEGE FOR WOMEN")
+st.markdown("### Code Chef Result Analysis Portal")
 st.markdown("### DEPARTMENT OF COMPUTER SCIENCE AND ENGINEERING")
 
 # Dropdown list placed after the Department heading
@@ -55,7 +55,7 @@ contest_type = st.selectbox(
     index=0
 )
 
-st.write("---") # Visual separator
+st.write("---") 
 st.info(f"Please upload the Excel file for **{contest_type}** below.")
 
 uploaded_file = st.file_uploader("Choose an Excel file", type=["xlsx"])
@@ -64,7 +64,7 @@ if uploaded_file is not None:
     try:
         df = pd.read_excel(uploaded_file)
         
-        # Router logic based on dropdown selection
+        # 1. Router logic
         if contest_type == "Daily Assessment":
             df["Category"] = df["User Score"].apply(categorize_daily)
             score_cols = ["300", "299-200", "200-100", "100-10", "0", "AB"]
@@ -77,11 +77,11 @@ if uploaded_file is not None:
             df["Category"] = df["Grade"].apply(categorize_wednesday)
             score_cols = [">1500", "1000-1500", "500-999", "100-499", "1-99", "0"]
 
-        # Process the crosstab table
+        # 2. Process Table
         result = pd.crosstab(df["Section"], df["Category"])
         result = result.reindex(columns=score_cols, fill_value=0)
         
-        # Statistics Calculation
+        # 3. Stats & Restoration of Remarks
         if contest_type == "Wednesday Contest":
             abs_counts = df[df['Attempted/Not'] == 'AB'].groupby('Section').size()
             result['Absentees'] = abs_counts.reindex(result.index, fill_value=0)
@@ -93,21 +93,25 @@ if uploaded_file is not None:
 
         result["Total Strength"] = result["Attended Count"] + result["Absentees"]
         
-        # Prepare final table for display
+        # RESTORED REMARKS: These are the "last 2 lines" in your report format
+        result['Remark 1'] = result['0'].apply(lambda x: f"{x} Students got 0")
+        result['Remark 2'] = result['Absentees'].apply(lambda x: f"{x} Students not written exam")
+        
+        # 4. Final Display Formatting
         result_final = result.reset_index()
         result_final.insert(0, 'S.No', range(1, 1 + len(result_final)))
         
         st.success(f"{contest_type} Analysis Complete!")
         st.dataframe(result_final, use_container_width=True)
 
-        # Excel Export logic with professional headers
+        # 5. Excel Export
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             result_final.to_excel(writer, index=False, startrow=8, sheet_name='Analysis')
             workbook = writer.book
             worksheet = writer.sheets['Analysis']
             
-            title_format = workbook.add_format({'align': 'center', 'bold': True, 'font_size': 12})
+            title_format = workbook.add_format({'align': 'center', 'bold': True, 'font_size': 11})
             header_format = workbook.add_format({'bold': True, 'border': 1, 'bg_color': '#D3D3D3', 'align': 'center'})
             
             titles = [
@@ -121,8 +125,10 @@ if uploaded_file is not None:
                 f"{contest_type.upper()} RESULT ANALYSIS DATA"
             ]
             
+            # Merge header across all columns including Remarks
+            last_col = len(result_final.columns) - 1
             for i, title in enumerate(titles):
-                worksheet.merge_range(i, 0, i, len(result_final.columns)-1, title, title_format)
+                worksheet.merge_range(i, 0, i, last_col, title, title_format)
 
             for col_num, value in enumerate(result_final.columns.values):
                 worksheet.write(8, col_num, value, header_format)
